@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>The Fixto - Tetris</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Kanit', sans-serif;
+            /* ภาพพื้นหลังสนามฟุตบอลกลางคืน */
+            background: url('https://images.unsplash.com/photo-1518605368461-1ee12523f81e?q=80&w=2070&auto=format&fit=crop') no-repeat center center fixed;
+            background-size: cover;
+            color: white;
+            touch-action: none;
+            overflow: hidden;
+        }
+        /* เลเยอร์สีดำทับเพื่อให้กล่องข้อความเด่นขึ้น */
+        body::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: -1;
+        }
+        .glass {
+            background: rgba(20, 20, 25, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 1rem;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        canvas {
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 0.5rem;
+        }
+        /* จัด Layout สำหรับมือถือ */
+        .mobile-controls {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            width: 100%;
+            max-width: 350px;
+            margin-top: 15px;
+        }
+        .control-btn {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            padding: 15px 0;
+            font-size: 24px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+        .control-btn:active { background: rgba(255, 255, 255, 0.4); }
+        .control-btn.red { background: rgba(239, 68, 68, 0.3); border-color: rgba(239, 68, 68, 0.6); }
+        .control-btn.pink { background: rgba(236, 72, 153, 0.3); border-color: rgba(236, 72, 153, 0.6); }
+
+        /* อนิเมชั่นแจ้งเตือน Live */
+        #live-popup {
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform: translateX(120%);
+        }
+        #live-popup.show {
+            transform: translateX(0);
+        }
+        /* แถบวิ่งด้านล่าง */
+        marquee { background: rgba(0,0,0,0.5); padding: 5px 0; font-size: 0.9rem; }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-center">
+
+    <!-- ป๊อปอัปแจ้งเตือนสด (Live Popup) -->
+    <div id="live-popup" class="fixed top-5 right-5 glass p-4 z-50 border-l-4 border-l-green-400 flex items-center gap-3">
+        <div class="animate-pulse w-3 h-3 bg-green-400 rounded-full"></div>
+        <div>
+            <p class="text-xs text-gray-300">🔴 Live Update</p>
+            <p id="live-popup-text" class="font-semibold text-sm">ผู้เล่นทำคะแนนใหม่!</p>
+        </div>
+    </div>
+
+    <!-- หน้าเมนูหลัก -->
+    <div id="main-menu" class="glass p-8 flex flex-col items-center w-[90%] max-w-md text-center z-10 absolute">
+        <h1 class="text-5xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">The Fixto</h1>
+        <p class="text-gray-300 mb-6">Tetris Online Edition</p>
+        
+        <div class="w-full mb-4">
+            <label class="block text-left text-sm mb-1 ml-1 text-gray-300">ชื่อผู้เล่น:</label>
+            <input type="text" id="player-name" placeholder="พิมพ์ชื่อของคุณ (หรือปล่อยว่าง)" class="w-full px-4 py-3 rounded-xl bg-black/50 border border-white/20 text-white focus:outline-none focus:border-blue-400 transition-colors">
+        </div>
+        
+        <button id="start-btn" class="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 py-3 rounded-xl font-bold text-lg mb-6 shadow-lg transform transition active:scale-95">เริ่มเกม 🎮</button>
+        
+        <div class="w-full border-t border-white/20 pt-4">
+            <label class="block text-left text-sm mb-1 ml-1 text-gray-300">ส่งข้อเสนอแนะ (Feedback):</label>
+            <textarea id="feedback-input" rows="2" placeholder="พบปัญหาหรือมีข้อเสนอแนะ พิมพ์ที่นี่เลย..." class="w-full px-4 py-2 rounded-xl bg-black/50 border border-white/20 text-white text-sm mb-2 focus:outline-none focus:border-green-400 resize-none"></textarea>
+            <button id="send-feedback-btn" class="w-full bg-green-600/80 hover:bg-green-600 py-2 rounded-xl font-medium text-sm transition">ส่ง Feedback ✉️</button>
+        </div>
+    </div>
+
+    <!-- แถบวิ่งด้านล่างสุดของหน้าจอเมนู -->
+    <marquee id="live-feed" class="fixed bottom-0 w-full z-10 hidden text-green-300 font-medium">ยินดีต้อนรับสู่ The Fixto! ... รอโหลดข้อมูลล่าสุด ...</marquee>
+
+    <!-- หน้าต่างเล่นเกม -->
+    <div id="game-ui" class="hidden flex-col items-center w-full max-w-md z-10 px-2">
+        <!-- ข้อมูลด้านบน -->
+        <div class="w-full flex justify-between items-center glass px-4 py-2 mb-3">
+            <div>
+                <p class="text-xs text-gray-400">SCORE</p>
+                <p id="score-display" class="font-bold text-xl leading-none">0</p>
+            </div>
+            <div class="text-center">
+                <p class="text-xs text-gray-400">LEVEL</p>
+                <p id="level-display" class="font-bold text-xl leading-none text-blue-400">1</p>
+            </div>
+            <div class="text-right flex items-center gap-2">
+                <div>
+                    <p class="text-xs text-gray-400">LINES</p>
+                    <p id="lines-display" class="font-bold text-xl leading-none text-purple-400">0</p>
+                </div>
+                <button id="pause-btn" class="ml-2 bg-white/20 p-2 rounded-lg active:bg-white/40">⏸️</button>
+            </div>
+        </div>
+
+        <!-- พื้นที่กระดาน -->
+        <div class="flex gap-2 justify-center items-start">
+            <div class="flex flex-col gap-2">
+                <div class="glass p-2 text-center">
+                    <p class="text-[10px] text-gray-400 mb-1">HOLD</p>
+                    <canvas id="hold-canvas" width="80" height="80"></canvas>
+                </div>
+            </div>
+            
+            <div class="glass p-1">
+                <canvas id="board-canvas" width="240" height="480"></canvas>
+            </div>
+
+            <div class="flex flex-col gap-2">
+                <div class="glass p-2 text-center">
+                    <p class="text-[10px] text-gray-400 mb-1">NEXT</p>
+                    <canvas id="next-canvas" width="80" height="80"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- ปุ่มควบคุมบนมือถือ -->
+        <div class="mobile-controls">
+            <div id="btn-hold" class="control-btn pink text-sm font-bold">HOLD</div>
+            <div id="btn-up" class="control-btn text-3xl">↻</div>
+            <div id="btn-hard" class="control-btn red text-sm font-bold">DROP</div>
+            <div id="btn-left" class="control-btn text-3xl">←</div>
+            <div id="btn-down" class="control-btn text-3xl">↓</div>
+            <div id="btn-right" class="control-btn text-3xl">→</div>
+        </div>
+    </div>
+
+    <!-- ป๊อปอัปแจ้งเตือนหยุดเกม -->
+    <div id="pause-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+        <div class="glass p-8 text-center w-64">
+            <h2 class="text-3xl font-bold mb-6 text-yellow-400">PAUSED</h2>
+            <button id="resume-btn" class="w-full bg-blue-500 py-3 rounded-xl font-bold mb-3">เล่นต่อ ▶️</button>
+            <button id="quit-btn" class="w-full bg-red-500/80 py-3 rounded-xl font-bold">ออกหน้าหลัก 🏠</button>
+        </div>
+    </div>
+
+    <!-- ป๊อปอัป Game Over & Leaderboard -->
+    <div id="leaderboard-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+        <div class="glass p-6 w-[95%] max-w-sm flex flex-col max-h-[90vh]">
+            <h2 class="text-3xl font-bold text-center mb-1 text-red-400">GAME OVER</h2>
+            <p id="final-score-text" class="text-center text-lg mb-4 text-gray-200"></p>
+
+            <div class="flex-1 overflow-y-auto pr-2 mb-4 bg-black/30 rounded-xl p-3" id="leaderboard-list">
+                <!-- รายชื่อ 20 อันดับจะมาแสดงที่นี่ -->
+                <p class="text-center text-gray-400 text-sm my-4">กำลังโหลดสถิติ...</p>
+            </div>
+
+            <!-- โซน CSV -->
+            <div class="flex justify-between gap-2 mb-4">
+                <button id="export-csv-btn" class="flex-1 bg-green-600/80 hover:bg-green-500 text-xs py-2 rounded-lg">📥 โหลดออก CSV</button>
+                <button id="import-csv-btn" class="flex-1 bg-purple-600/80 hover:bg-purple-500 text-xs py-2 rounded-lg" onclick="document.getElementById('csv-file').click()">📤 นำเข้า CSV</button>
+                <input type="file" id="csv-file" accept=".csv" class="hidden">
+            </div>
+
+            <button id="play-again-btn" class="w-full bg-blue-600 py-3 rounded-xl font-bold shadow-lg text-lg">เล่นอีกครั้ง 🔄</button>
+        </div>
+    </div>
+
+    <!-- ==============================================
+         โค้ดระบบเกม (JavaScript) + Firebase 
+         ============================================== -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+        // โค้ด Firebase ของคุณ Ratthaphum (ที่ให้มา)
+        const customFirebaseConfig = {
+            apiKey: "AIzaSyDkS9m5U7HK8SK4I4qVWSjE7AiBl9TFDbs",
+            authDomain: "the-fixto.firebaseapp.com",
+            projectId: "the-fixto",
+            storageBucket: "the-fixto.firebasestorage.app",
+            messagingSenderId: "80319380546",
+            appId: "1:80319380546:web:875fd50c66efc2766f81db",
+            measurementId: "G-248VKW53Y0"
+        };
+
+        let db, auth;
+        let isOnline = false;
+        let leaderboardData = [];
+        let initialLoadDone = false;
+
+        // เชื่อมต่อฐานข้อมูล
+        try {
+            const app = initializeApp(customFirebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+            
+            signInAnonymously(auth).then(() => {
+                isOnline = true;
+                setupRealtimeListener();
+            }).catch(e => {
+                console.log("Auth Failed (Offline Mode): ", e);
+            });
+        } catch (e) {
+            console.log("Firebase Init Failed (Offline Mode): ", e);
+        }
+
+        // ฟังชันก์ Real-time สำหรับดึงอันดับ 20 คนแรก
+        function setupRealtimeListener() {
+            const q = query(collection(db, "leaderboard"), orderBy("score", "desc"), limit(20));
+            onSnapshot(q, (snapshot) => {
+                const newData = [];
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === "added" && initialLoadDone) {
+                        const d = change.doc.data();
+                        showLivePopup(d.name, d.score);
+                        updateLiveFeed(`ผู้เล่น ${d.name} เพิ่งทำคะแนนได้ ${d.score} คะแนน! 🔥`);
+                    }
+                });
+                
+                snapshot.forEach((doc) => {
+                    newData.push(doc.data());
+                });
+                
+                leaderboardData = newData;
+                renderLeaderboardUI();
+                initialLoadDone = true;
+                
+                if (leaderboardData.length > 0 && !document.getElementById('live-feed').innerText.includes('🔥')) {
+                    updateLiveFeed(`อันดับ 1 ตอนนี้คือ ${leaderboardData[0].name} (${leaderboardData[0].score} แต้ม) 👑`);
+                }
+            }, (err) => {
+                console.log("Realtime Listener Error: ", err);
+            });
+        }
+
+        // ------------------ UI Functions ------------------
+        const livePopup = document.getElementById('live-popup');
+        const livePopupText = document.getElementById('live-popup-text');
+        const liveFeed = document.getElementById('live-feed');
+
+        function showLivePopup(name, score) {
+            livePopupText.innerText = `${name} ทำได้ ${score} แต้ม!`;
+            livePopup.classList.add('show');
+            setTimeout(() => livePopup.classList.remove('show'), 4000);
+        }
+
+        function updateLiveFeed(text) {
+            liveFeed.innerText = text;
+        }
+
+        function renderLeaderboardUI() {
+            const listDiv = document.getElementById('leaderboard-list');
+            listDiv.innerHTML = '';
+            if (leaderboardData.length === 0) {
+                listDiv.innerHTML = '<p class="text-center text-gray-400">ยังไม่มีสถิติ (ออฟไลน์หรือยังไม่มีคนเล่น)</p>';
+                return;
+            }
+
+            leaderboardData.forEach((data, index) => {
+                const rankColor = index === 0 ? 'text-yellow-400' : index === 1 ? 'text-gray-300' : index === 2 ? 'text-yellow-700' : 'text-gray-400';
+                listDiv.innerHTML += `
+                    <div class="flex justify-between items-center bg-white/10 rounded-lg p-2 mb-2 border border-white/5">
+                        <div class="flex items-center gap-3">
+                            <span class="${rankColor} font-bold w-5 text-center">${index + 1}</span>
+                            <span class="font-medium text-sm truncate w-24">${data.name || 'Anonymous'}</span>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-pink-400 font-bold">${data.score}</span>
+                            <p class="text-[10px] text-gray-400">Lv.${data.level} | ${data.lines}L</p>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        // ระบบส่ง Feedback
+        document.getElementById('send-feedback-btn').addEventListener('click', async () => {
+            const input = document.getElementById('feedback-input');
+            const text = input.value.trim();
+            const btn = document.getElementById('send-feedback-btn');
+            
+            if(!text) return alert("กรุณาพิมพ์ข้อเสนอแนะก่อนกดส่งครับ");
+            
+            btn.innerText = "กำลังส่ง...";
+            if(isOnline && db) {
+                try {
+                    await addDoc(collection(db, "feedback"), {
+                        text: text,
+                        timestamp: serverTimestamp()
+                    });
+                    input.value = '';
+                    btn.innerText = "ส่งสำเร็จแล้ว! ✅";
+                    btn.classList.replace('bg-green-600/80', 'bg-blue-600');
+                    setTimeout(() => {
+                        btn.innerText = "ส่ง Feedback ✉️";
+                        btn.classList.replace('bg-blue-600', 'bg-green-600/80');
+                    }, 3000);
+                } catch(e) {
+                    btn.innerText = "ผิดพลาด (ออฟไลน์) ❌";
+                }
+            } else {
+                btn.innerText = "ออฟไลน์ ไม่สามารถส่งได้ ❌";
+            }
+        });
+
+        // ------------------ ระบบ CSV ------------------
+        document.getElementById('export-csv-btn').addEventListener('click', () => {
+            if(leaderboardData.length === 0) return alert("ยังไม่มีข้อมูลให้บันทึก");
+            let csv
